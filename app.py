@@ -17,7 +17,6 @@ if language == "العربية":
     prompt_prefix = "اكتب قصة قصيرة وممتعة للأطفال عن: "
     loading_msg = "جاري تأليف قصتك السحرية..."
     audio_label = "استمع للقصة 🔊"
-    # تحسين طريقة الـ CSS لتجنب الخطأ
     st.markdown('<style>body{direction: rtl; text-align: right;}</style>', unsafe_allow_html=True)
 else:
     title = "🪄 Smart Tales"
@@ -30,40 +29,44 @@ else:
 
 st.title(title)
 
-# مدخلات المستخدم
-user_topic = st.text_input(input_label)
+# --- نظام جلب مفتاح API الذكي ---
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
-    # هذا السطر للأمان فقط في حال نسيت وضعه في Secrets
-    api_key = st.sidebar.text_input("أدخل مفتاح Gemini API", type="password")
+    api_key = st.sidebar.text_input("أدخل مفتاح Gemini API يدوياً", type="password")
+
+# مدخلات المستخدم
+user_topic = st.text_input(input_label)
+
 if st.button(button_text):
     if user_topic:
-        with st.spinner(loading_msg):
-            try:
-                # يجب أن يكون هناك 4 مسافات أو (Tab) قبل الأسطر التالية
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                model = genai.GenerativeModel('gemini-pro')
-                
-                full_prompt = f"{prompt_prefix} {user_topic}"
-                response = model.generate_content(full_prompt)
-                story_text = response.text
-                
-                # عرض القصة
-                st.markdown("---")
-                st.write(story_text)
-                
-                # إضافة الصوت (مجاناً)
-                st.markdown(f"### {audio_label}")
-                lang_code = 'ar' if language == "العربية" else 'en'
-                tts = gTTS(text=story_text, lang=lang_code)
-                
-                # حفظ الصوت في الذاكرة المؤقتة
-                audio_fp = io.BytesIO()
-                tts.write_to_fp(audio_fp)
-                st.audio(audio_fp, format='audio/mp3')
-                
-            except Exception as e:
-                st.error("حدث خطأ! تأكد من إعداد مفتاح API." if language == "العربية" else "Error! Make sure API Key is set.")
+        if not api_key: # إذا لم يتوفر مفتاح في السكرت ولا في الشريط الجانبي
+            st.error("يرجى توفير مفتاح API للبدء!" if language == "العربية" else "Please provide an API Key!")
+        else:
+            with st.spinner(loading_msg):
+                try:
+                    # التعديل الهام هنا: نستخدم المتغير api_key الذي عرفناه بالأعلى
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel('gemini-pro')
+                    
+                    full_prompt = f"{prompt_prefix} {user_topic}"
+                    response = model.generate_content(full_prompt)
+                    story_text = response.text
+                    
+                    # عرض القصة
+                    st.markdown("---")
+                    st.write(story_text)
+                    
+                    # إضافة الصوت
+                    st.markdown(f"### {audio_label}")
+                    lang_code = 'ar' if language == "العربية" else 'en'
+                    tts = gTTS(text=story_text, lang=lang_code)
+                    
+                    audio_fp = io.BytesIO()
+                    tts.write_to_fp(audio_fp)
+                    st.audio(audio_fp, format='audio/mp3')
+                    
+                except Exception as e:
+                    st.error(f"Error: {e}")
     else:
-            st.warning("يرجى إدخال عنوان!" if language == "العربية" else "Please enter a topic!")
+        st.warning("يرجى إدخال عنوان!" if language == "العربية" else "Please enter a topic!")
