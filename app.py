@@ -37,29 +37,29 @@ if st.button(button_text):
     if user_topic:
         with st.spinner(loading_msg):
             try:
-                    # يجب أن يكون هناك 4 مسافات أو (Tab) قبل الأسطر التالية
-                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    model = genai.GenerativeModel('gemini-pro')
-                    
-                    full_prompt = f"{prompt_prefix} {user_topic}"
-                    response = model.generate_content(full_prompt)
-                    story_text = response.text
-                    
-                    # عرض القصة
-                    st.markdown("---")
-                    st.write(story_text)
-                    
-                    # إضافة الصوت (مجاناً)
-                    st.markdown(f"### {audio_label}")
-                    lang_code = 'ar' if language == "العربية" else 'en'
-                    tts = gTTS(text=story_text, lang=lang_code)
-                    
-                    # حفظ الصوت في الذاكرة المؤقتة
-                    audio_fp = io.BytesIO()
-                    tts.write_to_fp(audio_fp)
-                    st.audio(audio_fp, format='audio/mp3')
-                    
-                except Exception as e:
-                    st.error("حدث خطأ! تأكد من إعداد مفتاح API." if language == "العربية" else "Error! Make sure API Key is set.")
+                # يجب أن يكون هناك 4 مسافات أو (Tab) قبل الأسطر التالية
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                model = genai.GenerativeModel('gemini-pro')
+                
+                full_prompt = f"{prompt_prefix} {user_topic}"
+                response = model.generate_content(full_prompt)
+                story_text = response.text
+                
+                # عرض القصة
+                st.markdown("---")
+                st.write(story_text)
+                
+                # إضافة الصوت (مجاناً)
+                st.markdown(f"### {audio_label}")
+                lang_code = 'ar' if language == "العربية" else 'en'
+                tts = gTTS(text=story_text, lang=lang_code)
+                
+                # حفظ الصوت في الذاكرة المؤقتة
+                audio_fp = io.BytesIO()
+                tts.write_to_fp(audio_fp)
+                st.audio(audio_fp, format='audio/mp3')
+                
+            except Exception as e:
+                st.error("حدث خطأ! تأكد من إعداد مفتاح API." if language == "العربية" else "Error! Make sure API Key is set.")
         else:
-        st.warning("يرجى إدخال عنوان!" if language == "العربية" else "Please enter a topic!")
+            st.warning("يرجى إدخال عنوان!" if language == "العربية" else "Please enter a topic!")
