@@ -32,7 +32,11 @@ st.title(title)
 
 # مدخلات المستخدم
 user_topic = st.text_input(input_label)
-
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    # هذا السطر للأمان فقط في حال نسيت وضعه في Secrets
+    api_key = st.sidebar.text_input("أدخل مفتاح Gemini API", type="password")
 if st.button(button_text):
     if user_topic:
         with st.spinner(loading_msg):
