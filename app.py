@@ -47,7 +47,7 @@ if st.button(button_text):
                 try:
                     # التعديل الهام هنا: نستخدم المتغير api_key الذي عرفناه بالأعلى
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     full_prompt = f"{prompt_prefix} {user_topic}"
                     response = model.generate_content(full_prompt)
