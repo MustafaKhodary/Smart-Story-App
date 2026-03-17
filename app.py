@@ -2,8 +2,10 @@ import streamlit as st
 import google.generativeai as genai
 from gtts import gTTS
 import io
+
 # Page Configuration
 st.set_page_config(page_title="حكايات ذكية - Smart Tales", layout="centered")
+
 # Language Selection
 language = st.sidebar.selectbox("اختر اللغة / Select Language", ["العربية", "English"])
 
@@ -24,14 +26,18 @@ else:
     loading_msg = "Crafting your magic story..."
     audio_label = "Listen to the story 🔊"
     st.markdown('<style>body{direction: ltr; text-align: left;}</style>', unsafe_allow_html=True)
+
 st.title(title)
+
 # --- API Key Management ---
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
     api_key = st.sidebar.text_input("أدخل مفتاح Gemini API يدوياً" if language == "العربية" else "Enter Gemini API Key manually", type="password")
+
 # User Input
 user_topic = st.text_input(input_label)
+
 if st.button(button_text):
     if user_topic:
         if not api_key:
@@ -41,33 +47,54 @@ if st.button(button_text):
                 try:
                     # Configure the API
                     genai.configure(api_key=api_key)
-                    # FIX: Using 'gemini-1.5-flash-latest' or 'gemini-2.0-flash' which are more stable
-                    # Based on the error, 'gemini-1.5-flash' might have been deprecated or requires a specific version
-                    model_name = 'gemini-1.5-flash-latest' 
-                    model = genai.GenerativeModel(model_name)
                     
-                    full_prompt = f"{prompt_prefix} {user_topic}"
-                    response = model.generate_content(full_prompt)
-                    if response.text:
-                        story_text = response.text
+                    # Try multiple model names in order of preference
+                    # Some API keys only have access to specific versions
+                    model_names_to_try = [
+                        'gemini-1.5-flash',
+                        'gemini-1.5-flash-latest',
+                        'gemini-2.0-flash',
+                        'gemini-pro'
+                    ]
+                    
+                    model = None
+                    last_error = ""
+                    
+                    for name in model_names_to_try:
+                        try:
+                            # Attempt to initialize and generate a small test content
+                            temp_model = genai.GenerativeModel(name)
+                            # We don't actually call generate_content here to save tokens, 
+                            # but we'll try the main call with this model.
+                            model = temp_model
+                            full_prompt = f"{prompt_prefix} {user_topic}"
+                            response = model.generate_content(full_prompt)
+                            
+                            if response.text:
+                                story_text = response.text
+                                break # Success!
+                        except Exception as e:
+                            last_error = str(e)
+                            continue # Try next model
+                    
+                    if model and 'story_text' in locals():
                         # Display Story
                         st.markdown("---")
                         st.write(story_text)
+                        
                         # Text-to-Speech
                         st.markdown(f"### {audio_label}")
                         lang_code = 'ar' if language == "العربية" else 'en'
                         tts = gTTS(text=story_text, lang=lang_code)
+
                         audio_fp = io.BytesIO()
                         tts.write_to_fp(audio_fp)
                         st.audio(audio_fp, format='audio/mp3')
                     else:
-                        st.error("لم يتم توليد أي محتوى. يرجى المحاولة مرة أخرى." if language == "العربية" else "No content generated. Please try again.")
+                        st.error(f"Error: Could not find a compatible Gemini model. Last error: {last_error}")
+                        st.info("Please ensure the 'Generative Language API' is enabled in your Google Cloud Console.")
+               
                 except Exception as e:
-                    # Enhanced error message for the user
-                    error_msg = str(e)
-                    if "404" in error_msg:
-                        st.error(f"Error: Model not found. Please check if '{model_name}' is available for your API key or try 'gemini-1.5-flash'.")
-                    else:
-                        st.error(f"Error: {e}")
+                    st.error(f"Error: {e}")
     else:
         st.warning("يرجى إدخال عنوان!" if language == "العربية" else "Please enter a topic!")
