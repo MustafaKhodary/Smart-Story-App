@@ -38,7 +38,7 @@ if st.button(button_text):
         with st.spinner(loading_msg):
             try:
                 # إعداد Gemini (تأكد من إعداد المفتاح في Secrets على Streamlit Cloud)
-                genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 model = genai.GenerativeModel('gemini-pro')
                 
                 full_prompt = f"{prompt_prefix} {user_topic}"
