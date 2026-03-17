@@ -1,35 +1,50 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(page_title="حكايات الصغار", page_icon="🌙")
-st.title("🌙 مؤلف قصص الأطفال الذكي")
+# إعداد واجهة المستخدم
+st.set_page_config(page_title="حكايات ذكية - Smart Tales", layout="centered")
 
-# --- محرك البحث عن المفتاح ---
-# هنا يحاول الكود قراءة المفتاح من الـ Secrets أولاً
-if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
+# إضافة اختيار اللغة في الشريط الجانبي
+language = st.sidebar.selectbox("اختر اللغة / Select Language", ["العربية", "English"])
+
+# تخصيص النصوص بناءً على اللغة المختارة
+if language == "العربية":
+    title = "🪄 حكايات ذكية"
+    input_label = "ماذا تريد أن تكون قصة اليوم؟"
+    button_text = "تأليف القصة"
+    prompt_prefix = "اكتب قصة قصيرة وممتعة للأطفال عن: "
+    loading_msg = "جاري تأليف قصتك السحرية..."
+    st.markdown("""<style> .stApp { direction: rtl; text-align: right; } </style>""", unsafe_check_html=True)
 else:
-    # هذا السطر للأمان فقط في حال نسيت وضعه في Secrets
-    api_key = st.sidebar.text_input("أدخل مفتاح Gemini API", type="password")
+    title = "🪄 Smart Tales"
+    input_label = "What should today's story be about?"
+    button_text = "Generate Story"
+    prompt_prefix = "Write a short, engaging children's story about: "
+    loading_msg = "Crafting your magic story..."
+    st.markdown("""<style> .stApp { direction: ltr; text-align: left; } </style>""", unsafe_check_html=True)
 
-user_input = st.text_area("عن ماذا تريد قصة اليوم؟")
+st.title(title)
 
-if st.button("تأليف القصة ✨"):
-    if api_key and user_input:
-        try:
-            genai.configure(api_key=api_key)
-            # البحث التلقائي عن الموديل
-            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            if available_models:
-                model = genai.GenerativeModel(model_name=available_models[0])
-                with st.spinner("جاري تأليف الحكاية..."):
-                    response = model.generate_content(f"اكتب قصة تربوية للأطفال عن: {user_input} بالعربية")
-                    st.success("تمت القصة!")
-                    st.markdown("---")
-                    st.write(response.text)
-            else:
-                st.error("لم يتم العثور على موديلات.")
-        except Exception as e:
-            st.error(f"حدث خطأ: {e}")
+# مدخلات المستخدم
+user_topic = st.text_input(input_label)
+
+if st.button(button_text):
+    if user_topic:
+        with st.spinner(loading_msg):
+            try:
+                # إعداد Gemini (تأكد من وضع المفتاح الخاص بك هنا)
+                # genai.configure(api_key="YOUR_API_KEY")
+                model = genai.GenerativeModel('gemini-pro')
+                
+                # إرسال الطلب بناءً على اللغة
+                full_prompt = f"{prompt_prefix} {user_topic}"
+                response = model.generate_content(full_prompt)
+                
+                # عرض القصة
+                st.markdown("---")
+                st.write(response.text)
+                
+            except Exception as e:
+                st.error("حدث خطأ ما، يرجى المحاولة لاحقاً." if language == "العربية" else "Something went wrong, please try again.")
     else:
-        st.warning("يرجى كتابة فكرة للقصة")
+        st.warning("يرجى إدخال عنوان أو فكرة!" if language == "العربية" else "Please enter a topic or idea!")
