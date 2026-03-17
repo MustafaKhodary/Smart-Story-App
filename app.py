@@ -37,7 +37,7 @@ if st.button(button_text):
     if user_topic:
         with st.spinner(loading_msg):
             try:
-                # إعداد Gemini (تأكد من إعداد المفتاح في Secrets على Streamlit Cloud)
+                # يجب أن يكون هناك 4 مسافات أو (Tab) قبل الأسطر التالية
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 model = genai.GenerativeModel('gemini-pro')
                 
