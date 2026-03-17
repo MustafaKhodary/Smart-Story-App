@@ -48,36 +48,34 @@ if st.button(button_text):
                     # Configure the API
                     genai.configure(api_key=api_key)
                     
-                    # Try multiple model names in order of preference
-                    # Some API keys only have access to specific versions
+                    # Based on diagnostic results, these are the correct model names for your key:
+                    # We'll try the most advanced ones first.
                     model_names_to_try = [
-                        'gemini-1.5-flash',
-                        'gemini-1.5-flash-latest',
-                        'gemini-2.0-flash',
-                        'gemini-pro'
+                        'gemini-2.5-flash',      # Newest stable
+                        'gemini-2.0-flash',      # High performance
+                        'gemini-flash-latest',   # Reliable alias
+                        'gemini-1.5-flash'       # Legacy (if still active)
                     ]
                     
                     model = None
+                    story_text = None
                     last_error = ""
                     
                     for name in model_names_to_try:
                         try:
-                            # Attempt to initialize and generate a small test content
-                            temp_model = genai.GenerativeModel(name)
-                            # We don't actually call generate_content here to save tokens, 
-                            # but we'll try the main call with this model.
-                            model = temp_model
+                            # Attempt to initialize and generate content
+                            model = genai.GenerativeModel(name)
                             full_prompt = f"{prompt_prefix} {user_topic}"
                             response = model.generate_content(full_prompt)
                             
-                            if response.text:
+                            if response and response.text:
                                 story_text = response.text
                                 break # Success!
                         except Exception as e:
                             last_error = str(e)
                             continue # Try next model
                     
-                    if model and 'story_text' in locals():
+                    if story_text:
                         # Display Story
                         st.markdown("---")
                         st.write(story_text)
@@ -91,8 +89,8 @@ if st.button(button_text):
                         tts.write_to_fp(audio_fp)
                         st.audio(audio_fp, format='audio/mp3')
                     else:
-                        st.error(f"Error: Could not find a compatible Gemini model. Last error: {last_error}")
-                        st.info("Please ensure the 'Generative Language API' is enabled in your Google Cloud Console.")
+                        st.error(f"Error: Could not generate story. Last error: {last_error}")
+                        st.info("Please ensure your API key has access to the latest Gemini models.")
                
                 except Exception as e:
                     st.error(f"Error: {e}")
