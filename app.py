@@ -61,5 +61,5 @@ if st.button(button_text):
                 
             except Exception as e:
                 st.error("حدث خطأ! تأكد من إعداد مفتاح API." if language == "العربية" else "Error! Make sure API Key is set.")
-        else:
+    else:
             st.warning("يرجى إدخال عنوان!" if language == "العربية" else "Please enter a topic!")
