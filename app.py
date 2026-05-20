@@ -5,7 +5,20 @@ import io
 
 # Page Configuration
 st.set_page_config(page_title="حكايات ذكية - Smart Tales", layout="centered")
-
+st.markdown(
+    """
+    <style>
+    /* منع إعادة التحميل عند السحب لأسفل في المتصفحات والجوال */
+    body {
+        overscroll-behavior-y: contain;
+    }
+    html {
+        overscroll-behavior-y: contain;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # Language Selection
 language = st.sidebar.selectbox("اختر اللغة / Select Language", ["العربية", "English"])
 
