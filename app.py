@@ -12,6 +12,8 @@ if 'audio_data' not in st.session_state:
     st.session_state.audio_data = None
 if 'last_topic' not in st.session_state:
     st.session_state.last_topic = ""
+if 'language' not in st.session_state:
+    st.session_state.language = "العربية"
 
 # ==========================================
 # PAGE CONFIGURATION
@@ -23,7 +25,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# CSS FIXES: Arabic Rendering + Scroll Behavior
+# CRITICAL CSS FIXES: Scroll + Arabic + Touch
 # ==========================================
 st.markdown(
     """
@@ -32,9 +34,15 @@ st.markdown(
     html, body {
         overscroll-behavior-y: none !important;
         overflow-x: hidden;
+        touch-action: pan-y;
     }
     
-    /* Fix Arabic text rendering - CRITICAL */
+    /* Prevent scroll anchoring from jumping */
+    * {
+        overflow-anchor: none !important;
+    }
+    
+    /* Fix Arabic text rendering */
     .arabic-text {
         direction: rtl !important;
         text-align: right !important;
@@ -57,18 +65,49 @@ st.markdown(
     }
     
     /* Prevent button focus from causing layout jumps */
-    button {
+    button, .stButton {
         touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Prevent iframe and audio player from causing reruns */
+    iframe, audio {
+        pointer-events: auto;
+        touch-action: none;
     }
     </style>
+    
+    <!-- JavaScript to prevent scroll-triggered reruns -->
+    <script>
+    // Prevent passive touch events from triggering Streamlit rerun
+    document.addEventListener('touchmove', function(e) {
+        e.preventDefault = false;
+    }, { passive: true });
+    
+    // Prevent scroll position from causing state issues
+    if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+    }
+    </script>
     """,
     unsafe_allow_html=True
 )
 
 # ==========================================
-# LANGUAGE SELECTION
+# LANGUAGE SELECTION (with session state)
 # ==========================================
-language = st.sidebar.selectbox("اختر اللغة / Select Language", ["العربية", "English"])
+language = st.sidebar.selectbox(
+    "اختر اللغة / Select Language", 
+    ["العربية", "English"],
+    index=0 if st.session_state.language == "العربية" else 1
+)
+
+# Update session state if language changed
+if language != st.session_state.language:
+    st.session_state.language = language
+    st.session_state.story_text = None
+    st.session_state.audio_data = None
+    st.rerun()
 
 # ==========================================
 # LOCALIZATION
@@ -114,9 +153,37 @@ else:
     )
 
 # ==========================================
-# USER INPUT
+# INPUT FORM (Prevents rerun on input changes)
 # ==========================================
-user_topic = st.text_input(input_label, key="topic_input")
+with st.form(key="story_form", clear_on_submit=False):
+    user_topic = st.text_input(
+        input_label, 
+        value=st.session_state.last_topic,
+        key="topic_input"
+    )
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        generate_submitted = st.form_submit_button(
+            button_text, 
+            use_container_width=True
+        )
+    
+    with col2:
+        clear_submitted = st.form_submit_button(
+            clear_button_text, 
+            use_container_width=True
+        )
+
+# ==========================================
+# CLEAR BUTTON HANDLER
+# ==========================================
+if clear_submitted:
+    st.session_state.story_text = None
+    st.session_state.audio_data = None
+    st.session_state.last_topic = ""
+    st.rerun()
 
 # ==========================================
 # GENERATION LOGIC
@@ -164,36 +231,27 @@ def generate_story(topic, api_key, lang):
     return story_text, audio_data, None
 
 # ==========================================
-# BUTTON HANDLERS
+# GENERATE BUTTON HANDLER
 # ==========================================
-col1, col2 = st.columns(2)
-
-with col1:
-    if st.button(button_text, key="generate_btn", use_container_width=True):
-        if not user_topic:
-            st.warning(error_topic)
-        elif not api_key:
-            st.error(error_api)
-        else:
-            with st.spinner(loading_msg):
-                story, audio, error = generate_story(user_topic, api_key, language)
-                
-                if story:
-                    st.session_state.story_text = story
-                    st.session_state.audio_data = audio
-                    st.session_state.last_topic = user_topic
-                else:
-                    st.error(f"{error_generate} {error}")
-
-with col2:
-    if st.button(clear_button_text, key="clear_btn", use_container_width=True):
-        st.session_state.story_text = None
-        st.session_state.audio_data = None
-        st.session_state.last_topic = ""
-        st.rerun()
+if generate_submitted:
+    if not user_topic:
+        st.warning(error_topic)
+    elif not api_key:
+        st.error(error_api)
+    else:
+        with st.spinner(loading_msg):
+            story, audio, error = generate_story(user_topic, api_key, language)
+            
+            if story:
+                st.session_state.story_text = story
+                st.session_state.audio_data = audio
+                st.session_state.last_topic = user_topic
+                st.rerun()
+            else:
+                st.error(f"{error_generate} {error}")
 
 # ==========================================
-# DISPLAY STORY (PERSISTED IN SESSION)
+# DISPLAY STORY (ISOLATED FROM INPUT - Won't lose on scroll)
 # ==========================================
 if st.session_state.story_text:
     st.markdown("---")
