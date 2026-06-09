@@ -233,13 +233,11 @@ if clear_submitted:
 # GENERATION LOGIC
 # ==========================================
 def generate_story(topic, api_key, lang):
-    genai.configure(api_key=api_key)
+    genai.configure(api_key=api_key, transport="rest")
     
     model_names_to_try = [
         'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-flash-latest',
-        'gemini-1.5-flash'
+        'gemini-3.5-flash'
     ]
     
     story_text = None
