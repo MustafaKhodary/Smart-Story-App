@@ -14,8 +14,6 @@ if 'last_topic' not in st.session_state:
     st.session_state.last_topic = ""
 if 'language' not in st.session_state:
     st.session_state.language = "العربية"
-if 'show_dialog' not in st.session_state:
-    st.session_state.show_dialog = False
 
 # ==========================================
 # PAGE CONFIGURATION
@@ -27,21 +25,32 @@ st.set_page_config(
 )
 
 # ==========================================
-# CSS FIXES
+# CSS FIXES - NO OVERLAY BLOCKING SCROLL
 # ==========================================
 st.markdown(
     """
     <style>
-    html, body {
+    /* Prevent pull-to-refresh - works on both html and body */
+    html {
         overscroll-behavior-y: none !important;
-        overflow-x: hidden;
-        touch-action: pan-y;
+        height: 100%;
+        overflow: auto;
     }
     
+    body {
+        overscroll-behavior-y: none !important;
+        overflow-x: hidden;
+        /* Allow normal scrolling but prevent bounce refresh */
+        touch-action: pan-y pinch-zoom;
+        min-height: 100%;
+    }
+    
+    /* Prevent scroll anchoring jumps */
     * {
         overflow-anchor: none !important;
     }
     
+    /* Fix Arabic text rendering */
     .arabic-text {
         direction: rtl !important;
         text-align: right !important;
@@ -52,62 +61,78 @@ st.markdown(
         line-height: 1.8;
     }
     
+    /* Prevent zoom on mobile inputs */
     input, textarea, select {
         font-size: 16px !important;
     }
     
+    /* Smooth scrolling */
     .stApp {
-        overflow-y: auto;
-        overscroll-behavior-y: none;
+        scroll-behavior: smooth;
     }
     
+    /* Button touch optimization */
     button, .stButton {
         touch-action: manipulation;
         -webkit-tap-highlight-color: transparent;
     }
     
-    iframe, audio {
-        pointer-events: auto;
-        touch-action: none;
-    }
-    
-    /* DIALOG STYLES */
-    .dialog-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
+    /* Audio player optimization */
+    audio {
         width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        z-index: 9999;
+        max-width: 100%;
+    }
+    
+    /* Floating action button style for Start Over */
+    .floating-btn-container {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
         display: flex;
-        justify-content: center;
-        align-items: center;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 10px 20px;
+        border-radius: 50px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        backdrop-filter: blur(10px);
     }
     
-    .dialog-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 20px;
-        padding: 30px;
-        max-width: 90%;
-        width: 380px;
-        text-align: center;
-        color: white;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-    }
-    
-    .dialog-title {
-        font-size: 1.8em;
-        margin-bottom: 15px;
-        font-weight: bold;
-    }
-    
-    .dialog-text {
-        font-size: 1.2em;
-        margin-bottom: 25px;
-        line-height: 1.6;
+    /* Hide Streamlit default elements that cause issues */
+    .stDeployButton, .stSpinner {
+        display: none !important;
     }
     </style>
+    
+    <!-- CRITICAL: Prevent pull-to-refresh with JavaScript -->
+    <script>
+    (function() {
+        let startY = 0;
+        
+        // Prevent pull-to-refresh by blocking touchstart at top of page
+        document.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+        
+        document.addEventListener('touchmove', function(e) {
+            let currentY = e.touches[0].clientY;
+            let isAtTop = (window.scrollY || document.documentElement.scrollTop) <= 0;
+            
+            // If pulling down at top of page, prevent default
+            if (isAtTop && currentY > startY) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Restore scroll position after rerun
+        if (window.scrollY > 0) {
+            setTimeout(function() {
+                window.scrollTo(0, window.scrollY);
+            }, 100);
+        }
+    })();
+    </script>
     """,
     unsafe_allow_html=True
 )
@@ -135,17 +160,13 @@ if language == "العربية":
     input_label = "ماذا تريد أن تكون قصة اليوم؟"
     button_text = "✨ تأليف القصة"
     clear_button_text = "🗑️ مسح القصة"
+    start_over_text = "🔄 بدء جديد"
     prompt_prefix = "اكتب قصة قصيرة وممتعة للأطفال عن: "
     loading_msg = "جاري تأليف قصتك السحرية..."
     audio_label = "🔊 استمع للقصة"
     error_api = "يرجى توفير مفتاح API للبدء!"
     error_topic = "يرجى إدخال موضوع!"
     error_generate = "عذراً، لم نتمكن من توليد القصة. الخطأ: "
-    
-    dialog_title = "⚠️ هل تريد البدء من جديد؟"
-    dialog_text = "ستفقد قصتك الحالية إذا واصلت!"
-    dialog_yes = "✅ نعم، ابدأ جديد"
-    dialog_no = "❌ لا، أبقَ هنا"
     
     st.markdown('<div class="arabic-text">', unsafe_allow_html=True)
     
@@ -154,101 +175,15 @@ else:
     input_label = "What should today's story be about?"
     button_text = "✨ Generate Story"
     clear_button_text = "🗑️ Clear Story"
+    start_over_text = "🔄 Start Over"
     prompt_prefix = "Write a short, engaging children's story about: "
     loading_msg = "Crafting your magic story..."
     audio_label = "🔊 Listen to the story"
     error_api = "Please provide an API Key!"
     error_topic = "Please enter a topic!"
     error_generate = "Sorry, couldn't generate the story. Error: "
-    
-    dialog_title = "⚠️ Start Over?"
-    dialog_text = "You'll lose your current story if you continue!"
-    dialog_yes = "✅ Yes, Start New"
-    dialog_no = "❌ No, Stay Here"
 
 st.title(title)
-
-# ==========================================
-# DIALOG DISPLAY (When activated)
-# ==========================================
-if st.session_state.story_text and st.session_state.show_dialog:
-    # Visual overlay
-    st.markdown(
-        f"""
-        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                    background: rgba(0,0,0,0.85); z-index: 9999; display: flex; 
-                    justify-content: center; align-items: center; backdrop-filter: blur(8px);">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                        border-radius: 25px; padding: 40px 30px; max-width: 90%; 
-                        width: 400px; text-align: center; color: white; 
-                        box-shadow: 0 25px 80px rgba(0,0,0,0.5);">
-                <div style="font-size: 2em; margin-bottom: 10px;">🤔</div>
-                <div style="font-size: 1.6em; margin-bottom: 15px; font-weight: bold;">{dialog_title}</div>
-                <div style="font-size: 1.2em; margin-bottom: 30px; opacity: 0.9;">{dialog_text}</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    
-    # Buttons (must be Streamlit native for interaction)
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button(dialog_yes, key="dlg_yes", use_container_width=True):
-            st.session_state.story_text = None
-            st.session_state.audio_data = None
-            st.session_state.last_topic = ""
-            st.session_state.show_dialog = False
-            st.rerun()
-    with c2:
-        if st.button(dialog_no, key="dlg_no", use_container_width=True):
-            st.session_state.show_dialog = False
-            st.rerun()
-    
-    st.stop()
-
-# ==========================================
-# SCROLL DETECTOR (JavaScript + Hidden Button)
-# ==========================================
-if st.session_state.story_text and not st.session_state.show_dialog:
-    # Inject JavaScript to detect scroll and trigger hidden button
-    scroll_detector_js = """
-    <script>
-    (function() {
-        let lastScroll = 0;
-        let triggered = false;
-        
-        function checkScroll() {
-            if (triggered) return;
-            let current = window.scrollY || document.documentElement.scrollTop;
-            
-            // Detect downward scroll past threshold
-            if (current > lastScroll && current > 200) {
-                triggered = true;
-                // Find and click the hidden Streamlit button
-                let buttons = document.querySelectorAll('button');
-                for (let btn of buttons) {
-                    if (btn.textContent.includes('🔄 SCROLL DETECTED')) {
-                        btn.click();
-                        break;
-                    }
-                }
-            }
-            lastScroll = current;
-        }
-        
-        window.addEventListener('scroll', checkScroll, { passive: true });
-        // Also check on touch end for mobile
-        document.addEventListener('touchend', checkScroll, { passive: true });
-    })();
-    </script>
-    """
-    st.markdown(scroll_detector_js, unsafe_allow_html=True)
-    
-    # Hidden button that JavaScript will click
-    if st.button("🔄 SCROLL DETECTED - HIDDEN", key="scroll_trigger", help="Auto-triggered on scroll"):
-        st.session_state.show_dialog = True
-        st.rerun()
 
 # ==========================================
 # API KEY MANAGEMENT
@@ -353,7 +288,6 @@ if generate_submitted:
                 st.session_state.story_text = story
                 st.session_state.audio_data = audio
                 st.session_state.last_topic = user_topic
-                st.session_state.show_dialog = False
                 st.rerun()
             else:
                 st.error(f"{error_generate} {error}")
@@ -364,6 +298,7 @@ if generate_submitted:
 if st.session_state.story_text:
     st.markdown("---")
     
+    # Story content with proper text wrapping
     if language == "العربية":
         st.markdown(
             f'<div class="arabic-text" style="font-size: 1.2em; padding: 20px;">{st.session_state.story_text}</div>',
@@ -372,9 +307,51 @@ if st.session_state.story_text:
     else:
         st.write(st.session_state.story_text)
     
+    # Audio player
     if st.session_state.audio_data:
         st.markdown(f"### {audio_label}")
         st.audio(io.BytesIO(st.session_state.audio_data), format='audio/mp3')
+    
+    # ==========================================
+    # FLOATING START OVER BUTTON (Always visible)
+    # ==========================================
+    st.markdown("---")
+    st.markdown(
+        """
+        <style>
+        .floating-action-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .floating-action-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # Use columns for the start over button at bottom
+    _, _, right_col = st.columns([1, 1, 1])
+    with right_col:
+        if st.button(start_over_text, key="start_over_btn", use_container_width=True):
+            st.session_state.story_text = None
+            st.session_state.audio_data = None
+            st.session_state.last_topic = ""
+            st.rerun()
 
 if language == "العربية":
     st.markdown('</div>', unsafe_allow_html=True)
